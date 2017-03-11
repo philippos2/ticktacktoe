@@ -6,6 +6,7 @@ import qualified System.Console.Readline  as Readline
 import qualified Data.Map                 as Map
 import qualified Data.List                as List
 import qualified Data.List.Split          as Split
+import qualified Data.Maybe               as Maybe
 
 import Control.Monad.State
 
@@ -38,13 +39,19 @@ initBoard (x, y) = Map.fromList $ map genCell [0..(x * y - 1)]
             | mod (n + 1) x > 0 && n < (x * y - 1) - x = (n, Blank)
             | otherwise = (n, Wall)
 
+cellLines :: Board -> [[Int]]
+cellLines board = rows board ++ columns board ++ diag1 board ++ diag2 board
+  where
+    rows    board = filter (/= []) . Split.splitWhen (\n -> (elem n . Map.keys $ Map.filter (== Wall) board)) $ Map.keys board
+    columns board = map (\n -> map (\x -> x !! n) $ rows board) [0..(length (rows board) - 1)]
+    diag1   board = [map (\n -> (rows board !! n) !! n) [0..(length (rows board) - 1)]]
+    diag2   board = [reverse $ map (\n -> (rows board !! (length (rows board) - 1 - n)) !! n) [0..(length (rows board) - 1)]]
+
 {------------------------------------------------
  盤面描画
  ------------------------------------------------}
 printBoard :: Board -> IO ()
-printBoard board = do
-  putStrLn . unlines . List.intersperse (partition board)
-    . map (\x -> List.intercalate "|" x) . rows $ Map.elems board
+printBoard board = putStrLn . unlines . List.intersperse (partition board) . map (\x -> List.intercalate "|" x) . rows $ Map.elems board
   where
     rows      board = filter (/= []) . map lines . Split.splitOn "W\n" . unlines $ map show board
     partition board = concat . List.intersperse "+" . replicate (lengthof board) $ "-"
@@ -56,16 +63,16 @@ printBoard board = do
  ゲームルーチン
  ------------------------------------------------}
 play :: Bool -> StateT Board IO String
-play isMachinesTurn = do
-  if isMachinesTurn
-    then machinesTurn
+play isCpusTurn = do
+  if isCpusTurn
+    then cpusTurn
     else usersTurn
 
   board <- get
   liftIO $ printBoard board
   liftIO $ print board
   case judge board of
-    Nothing     -> (play $ not isMachinesTurn)
+    Nothing     -> (play $ not isCpusTurn)
     Just result -> return result
 
 {------------------------------------------------
@@ -87,11 +94,13 @@ usersTurn = do
 {------------------------------------------------
  CPU側ターン
  ------------------------------------------------}
-machinesTurn :: StateT Board IO Int
-machinesTurn = do
+cpusTurn :: StateT Board IO Int
+cpusTurn = do
   liftIO $ putStrLn "CPU selected: "
   board <- get
-  return 0
+  let position = Maybe.fromJust . List.elemIndex Blank $ Map.elems board
+  updateBoard Cross position
+  return position
 
 {------------------------------------------------
  盤面更新
@@ -108,12 +117,15 @@ update mark position board = Map.insert position mark board
 judge :: Board -> Maybe String
 judge board
   | wonBy Nought  board = return "won by user."
-  | wonBy Cross   board = return "won by machine."
+  | wonBy Cross   board = return "won by cpu."
   | isThereBlank  board = return "drawn."
   | otherwise           = Nothing
   where
     isThereBlank board = Nothing == (List.elemIndex Blank $ Map.elems board)
 
 wonBy :: Mark -> Board -> Bool
-wonBy mark board = False
+wonBy mark board = do
+  any (== True) $ map (\e -> all (== mark) $ e) $ elemLines board
+  where
+    elemLines board = map (\n -> (map (\x -> Maybe.fromMaybe Blank $ Map.lookup x board) $ cellLines board !! n)) [0..((length $ cellLines board) -1)]
 
