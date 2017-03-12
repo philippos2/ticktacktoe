@@ -98,9 +98,27 @@ cpusTurn :: StateT Board IO Int
 cpusTurn = do
   liftIO $ putStrLn "CPU selected: "
   board <- get
-  let position = Maybe.fromJust . List.elemIndex Blank $ Map.elems board
-  updateBoard Cross position
-  return position
+  updateBoard Cross $ position board
+  return $ position board
+  where
+    position board = Maybe.fromJust $ strategize board
+    strategize = mplus <$> checkmate <*> assignBlank
+
+checkmate :: Board -> Maybe Int
+checkmate board =
+  if null . choises $ board
+    then Nothing
+    else return . head . choises $ board
+  where
+    choises board = concat . map (\line -> searchCheckmate line) $ cellLines board
+    searchCheckmate line = filter (\n -> isCheckmate line n) line
+    isCheckmate line n = False
+
+
+
+assignBlank :: Board -> Maybe Int
+assignBlank board =
+  List.elemIndex Blank $ Map.elems board
 
 {------------------------------------------------
  盤面更新
@@ -124,8 +142,9 @@ judge board
     isThereBlank board = Nothing == (List.elemIndex Blank $ Map.elems board)
 
 wonBy :: Mark -> Board -> Bool
-wonBy mark board = do
-  any (== True) $ map (\e -> all (== mark) $ e) $ elemLines board
+wonBy mark board =
+  any (== True) . map (\e -> all (== mark) $ e) $ elemLines board
   where
-    elemLines board = map (\n -> (map (\x -> Maybe.fromMaybe Blank $ Map.lookup x board) $ cellLines board !! n)) [0..((length $ cellLines board) -1)]
+    elemLines     board   = map (\n -> extractMarks board n) [0..((length $ cellLines board) - 1)]
+    extractMarks  board n = map (\x -> Maybe.fromMaybe Blank $ Map.lookup x board) $ cellLines board !! n
 
