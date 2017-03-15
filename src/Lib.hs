@@ -102,19 +102,28 @@ cpusTurn = do
   return $ position board
   where
     position board = Maybe.fromJust $ strategize board
-    strategize = mplus <$> checkmate <*> assignBlank
+    strategize =
+      block       <||>
+      checkmate   <||>
+      assignBlank
+    f1 <||> f2 = mplus <$> f1 <*> f2
 
 checkmate :: Board -> Maybe Int
-checkmate board =
-  if null . choises $ board
+checkmate = fillupLine Cross
+
+block :: Board -> Maybe Int
+block = fillupLine Nought
+
+fillupLine :: Mark -> Board -> Maybe Int
+fillupLine mark board =
+  if null $ choises mark board
     then Nothing
-    else return . head . choises $ board
+    else return . head $ choises mark board
   where
-    choises board = concat . map (\line -> searchCheckmate line) $ cellLines board
-    searchCheckmate line = filter (\n -> isCheckmate line n) line
-    isCheckmate line n = False
-
-
+    choises mark board              = concat . map (\line -> searchCheckmate mark board line) $ cellLines board
+    searchCheckmate mark board line = filter (\n -> isCheckmate mark board line n && Blank == lookupMark board n) line
+    isCheckmate mark board line n   = all (== mark) . map (\n -> lookupMark board n) $ filter (/= n) line
+    lookupMark board n              = Maybe.fromMaybe Blank $ Map.lookup n board
 
 assignBlank :: Board -> Maybe Int
 assignBlank board =
