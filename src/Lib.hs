@@ -52,11 +52,15 @@ cellLines board = rows board ++ columns board ++ diag1 board ++ diag2 board
  盤面描画
  ------------------------------------------------}
 printBoard :: Board -> IO ()
-printBoard board = putStrLn . unlines . List.intersperse (partition board) . map (\x -> List.intercalate "|" x) . rows $ Map.elems board
+printBoard board = do
+  let header = "  " ++ (List.intersperse ' ' $ take (lengthof board) ['a'..]) :: String
+  putStrLn header
+  putStrLn . unlines . zipWith (++) (numbers board) . List.intersperse (partition board) . map (\x -> List.intercalate "|" x) . rows $ Map.elems board
   where
     rows      board = filter (/= []) . map lines . Split.splitOn "W\n" . unlines $ map show board
     partition board = concat . List.intersperse "+" . replicate (lengthof board) $ "-"
     lengthof  board = head . map length . map concat . rows $ Map.elems board
+    numbers   board = map (++ " ") . List.intersperse " " $ map show [0..(lengthof board)]
 
 -------------------------------------------------------------------------------
 
@@ -81,7 +85,7 @@ play isCpusTurn = do
  ------------------------------------------------}
 usersTurn :: StateT Board IO Int
 usersTurn = do
-  liftIO $ putStrLn "your turn (q: quit): "
+  liftIO $ putStrLn "your turn (quit: q): "
   board    <- get
   position <- liftIO $ getPosition board
   updateBoard Nought position >> return position
