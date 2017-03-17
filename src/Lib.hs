@@ -9,6 +9,7 @@ import qualified Data.List.Split          as Split
 import qualified Data.Maybe               as Maybe
 
 import Control.Monad.State
+import System.Exit
 
 -------------------------------------------------------------------------------
 type Board = Map.Map Int Mark
@@ -70,7 +71,7 @@ play isCpusTurn = do
 
   board <- get
   liftIO $ printBoard board
-  liftIO $ print board
+  --liftIO $ print board
   case judge board of
     Nothing     -> (play $ not isCpusTurn)
     Just result -> return result
@@ -80,7 +81,7 @@ play isCpusTurn = do
  ------------------------------------------------}
 usersTurn :: StateT Board IO Int
 usersTurn = do
-  liftIO $ putStrLn "your turn: "
+  liftIO $ putStrLn "your turn (q: quit): "
   board    <- get
   position <- liftIO $ getPosition board
   updateBoard Nought position >> return position
@@ -89,7 +90,10 @@ usersTurn = do
       input <- getLine
       if elem input . map show . Map.keys $ Map.filter (== Blank) board
         then return (read input :: Int)
-        else putStrLn "wrong input" >> getPosition board
+        else
+          if input == "q"
+            then exitSuccess
+            else putStrLn "wrong input" >> getPosition board
 
 {------------------------------------------------
  CPU側ターン
