@@ -7,6 +7,7 @@ import qualified Data.Map                 as Map
 import qualified Data.List                as List
 import qualified Data.List.Split          as Split
 import qualified Data.Maybe               as Maybe
+import qualified Data.Char                as Char
 
 import Control.Monad.State
 import System.Exit
@@ -53,14 +54,19 @@ cellLines board = rows board ++ columns board ++ diag1 board ++ diag2 board
  ------------------------------------------------}
 printBoard :: Board -> IO ()
 printBoard board = do
-  let header = "  " ++ (List.intersperse ' ' $ take (lengthof board) ['a'..]) :: String
+  let header = "  " ++ (List.intersperse ' ' $ take (sizeof board) ['a'..]) :: String
   putStrLn header
-  putStrLn . unlines . zipWith (++) (numbers board) . List.intersperse (partition board) . map (\x -> List.intercalate "|" x) . rows $ Map.elems board
+  putStrLn . unlines . zipWith (++) (numbers board) . List.intersperse (partition board)
+    . map (\x -> List.intercalate "|" x) . rows $ Map.elems board
   where
-    rows      board = filter (/= []) . map lines . Split.splitOn "W\n" . unlines $ map show board
-    partition board = concat . List.intersperse "+" . replicate (lengthof board) $ "-"
-    lengthof  board = head . map length . map concat . rows $ Map.elems board
-    numbers   board = map (++ " ") . List.intersperse " " $ map show [0..(lengthof board)]
+    partition board = concat . List.intersperse "+" . replicate (sizeof board) $ "-"
+    numbers   board = map (++ " ") . List.intersperse " " $ map show [0..(sizeof board)]
+
+rows :: [Mark] -> [[[Char]]]
+rows board = filter (/= []) . map lines . Split.splitOn "W\n" . unlines $ map show board
+
+sizeof :: Board -> Int
+sizeof board = head . map length . map concat . rows $ Map.elems board
 
 -------------------------------------------------------------------------------
 
@@ -92,12 +98,23 @@ usersTurn = do
   where
     getPosition board = do
       input <- getLine
-      if elem input . map show . Map.keys $ Map.filter (== Blank) board
-        then return (read input :: Int)
-        else
-          if input == "q"
-            then exitSuccess
+      case input of
+        "q" -> exitSuccess
+        input
+          | filter Char.isAlpha  input == "" -> putStrLn "wrong input" >> getPosition board
+          | filter Char.isNumber input == "" -> putStrLn "wrong input" >> getPosition board
+        otherwise -> do
+          let position = transPosition input board
+          if elem position . Map.keys $ Map.filter (== Blank) board
+            then return position
             else putStrLn "wrong input" >> getPosition board
+    transPosition input board = do
+      let c = Maybe.fromMaybe 0 $ List.elemIndex (head $ filter Char.isAlpha  input) ['a'..]
+      let r = Maybe.fromMaybe 0 $ List.elemIndex (head $ filter Char.isNumber input) ['0'..]
+      let index = r * sizeof board + (c + mod r (sizeof board))
+      if index > length board
+        then length board
+        else Maybe.fromMaybe 0 $ Map.lookupIndex index board
 
 {------------------------------------------------
  CPU側ターン
